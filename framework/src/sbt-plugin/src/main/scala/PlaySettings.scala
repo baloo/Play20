@@ -124,6 +124,8 @@ trait PlaySettings {
 
     resourceGenerators in Compile <+= LessCompiler,
 
+    resourceGenerators in Compile <+= StylusCompiler,
+
     resourceGenerators in Compile <+= CoffeescriptCompiler,
 
     resourceGenerators in Compile <+= JavascriptCompiler,

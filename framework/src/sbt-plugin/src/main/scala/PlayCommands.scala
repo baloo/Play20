@@ -291,6 +291,11 @@ trait PlayCommands {
     { name => name.replace(".less", ".css") },
     { (lessFile, minify) => play.core.less.LessCompiler.compile(lessFile, minify) })
 
+  val StylusCompiler = AssetsCompiler("stylus",
+    { assets => (assets ** "*.styl") },
+    { name => name.replace(".styl", ".css") },
+    { (stylusFile, minify) => play.core.stylus.StylusCompiler.compile(stylusFile, minify) })
+
   val JavascriptCompiler = AssetsCompiler("javascripts",
     { assets => (assets ** "*.js") },
     identity,
