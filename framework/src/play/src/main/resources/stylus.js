@@ -1661,7 +1661,7 @@ Lexer.prototype = {
    */
 
   skip: function(len){
-    this.str = this.str.substr(Array.isArray(len)
+    this.str = this.str.substr((len instanceof Array)
       ? len[0].length
       : len);
   },
@@ -4166,7 +4166,7 @@ var Evaluator = require('../visitor/evaluator')
 
 var Node = module.exports = function Node(){
   this.lineno = nodes.lineno;
-  Object.defineProperty(this, 'filename', { writable: true, value: nodes.filename });
+  this.filename = { writable: true, value: nodes.filename };
 };
 
 /**
