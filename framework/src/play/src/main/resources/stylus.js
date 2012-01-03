@@ -2120,8 +2120,7 @@ Lexer.prototype = {
 
 
     if (captures) {
-      var tok
-        , indents = captures[1].length;
+      var tok, indents = captures[1].length;
 
       this.skip(captures);
       if (this.str[0] === ' ' || this.str[0] === '\t') {
