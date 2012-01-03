@@ -7307,18 +7307,18 @@ Renderer.prototype.define = function(name, fn, raw){
   return this;
 };
 
-// /**
-//  * Import the given `file`.
-//  *
-//  * @param {String} file
-//  * @return {Renderer} for chaining
-//  * @api public
-//  */
-// 
-// Renderer.prototype.import = function(file){
-//   this.options.imports.push(file);
-//   return this;
-// };
+/**
+ * Import the given `file`.
+ *
+ * @param {String} file
+ * @return {Renderer} for chaining
+ * @api public
+ */
+
+Renderer.prototype["import"] = function(file){
+  this.options.imports.push(file);
+  return this;
+};
 
 
 
