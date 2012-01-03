@@ -1716,7 +1716,7 @@ Lexer.prototype = {
       || this.string()
       || this.unit()
       || this.namedop()
-      || this.boolean()
+      || this["booleanish"]()
       || this.ident()
       || this.op()
       || this.space()
@@ -2049,7 +2049,7 @@ Lexer.prototype = {
    * 'true' | 'false'
    */
   
-  boolean: function() {
+  booleanish: function() {
     var captures;
     if (captures = /^(true|false)\b( *)/.exec(this.str)) {
       var val = nodes.Boolean('true' == captures[1]);
@@ -8331,7 +8331,7 @@ Compiler.prototype.visitHSLA = function(hsla){
 Compiler.prototype.visitUnit = function(unit){
   var type = unit.type || ''
     , n = unit.val
-    , float = n != (n | 0);
+    , myfloat = n != (n | 0);
 
   // Compress
   if (this.compress) {
@@ -8339,7 +8339,7 @@ Compiler.prototype.visitUnit = function(unit){
     // a percentage, this is required by keyframes
     if ('%' != type && 0 == n) return '0';
     // Omit leading '0' on floats
-    if (float && n < 1 && n > -1) {
+    if (myfloat && n < 1 && n > -1) {
       return n.toString().replace('0.', '.') + type;
     }
   }
