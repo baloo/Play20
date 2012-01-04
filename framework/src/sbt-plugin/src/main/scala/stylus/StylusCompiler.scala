@@ -119,9 +119,9 @@ var compile = function(source) {
 
   // This is dangerous as hell
   // But style.render do not return what callback function returns
-  var generatedContent = ""
+  var generatedContent = {}
 
-  style.render(function(err, css){
+  style.render(function(err, css, js, deps){
     if (err) {
       //java.lang.System.out.println(css.input);
       java.lang.System.out.println(css.filename);
@@ -129,7 +129,8 @@ var compile = function(source) {
       java.lang.System.out.println(css);
       java.lang.System.out.println(err);
     } else {
-      generatedContent = css;
+      deps.push(source)
+      generatedContent = {content: css, dependencies: deps};
     }
   });
 
@@ -144,11 +145,15 @@ var compile = function(source) {
     Context.exit
 
     (source: File) => {
-      println(source)
-      val result = Context.call(null, compilerFunction, scope, scope, Array(source))
-      val css = Context.toString(result)
+      val result = Context.call(null, compilerFunction, scope, scope, Array(source)).asInstanceOf[Scriptable]
+      val css = ScriptableObject.getProperty(result, "content").asInstanceOf[String]
+      val deps = ScriptableObject.getProperty(result, "dependencies").asInstanceOf[NativeArray]
 
-      css
+      css -> (0 until deps.getLength.toInt).map(
+        ScriptableObject.getProperty(deps,_) match {
+        case f: File => f
+        case o: NativeJavaObject => o.unwrap.asInstanceOf[File]
+      })
     }
   }
 
@@ -157,13 +162,11 @@ var compile = function(source) {
   private lazy val minCompiler = compiler(true)
 
   def compile(source: File, minify: Boolean): (String, Seq[File]) = {
-    println(source)
     try {
-      val compiledSource = minify match {
+      minify match {
         case true => minCompiler(source)
         case false => debugCompiler(source)
       }
-      (compiledSource, Seq[File]())
     } catch {
       case e: JavaScriptException => {
         val error = e.getValue.asInstanceOf[Scriptable]
