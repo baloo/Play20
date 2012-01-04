@@ -7218,7 +7218,7 @@ Renderer.prototype.render = function(fn){
     var compiler = new Compiler(ast, this.options)
       , css = compiler.compile()
       , js = compiler.js;
-    fn(null, css, js);
+    fn(null, css, js, this.options.imports);
   } catch (err) {
   //   var options = {};
   //   options.input = err.input || this.str;
