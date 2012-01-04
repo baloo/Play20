@@ -7220,12 +7220,12 @@ Renderer.prototype.render = function(fn){
       , js = compiler.js;
     fn(null, css, js, this.options.imports);
   } catch (err) {
-  //   var options = {};
+     var options = {};
   //   options.input = err.input || this.str;
-  //   options.filename = err.filename || this.options.filename;
-  //   options.lineno = err.lineno || parser.lexer.lineno;
+     options.filename = err.filename || this.options.filename;
+     options.lineno = err.lineno || parser.lexer.lineno;
   //   fn(utils.formatException(err, options));
-    fn(err);
+    fn(err, options);
   }
 };
 
