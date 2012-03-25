@@ -19,10 +19,12 @@ object Implicits{
  * Lenses
  */
 
-case class Lens[A >: JsValue,B](get: A => B, set: (A,B) => A) {
-  def apply(whole: A) = get(whole)
+case class Lens(get: JsValue => JsValue, set: (JsValue, JsValue) => JsValue) {
+  def apply(whole: JsValue) = get(whole)
 
-  def \(f: String) = Lens[A, JsValue](a => {
+  def apply(whole: JsValue, repl: JsValue) = set(whole, repl)
+
+  def \(f: String) = Lens(a => {
     get(a) match {
       case JsObject(fields) => fields
         .find(t => t._1 == f)
@@ -30,11 +32,33 @@ case class Lens[A >: JsValue,B](get: A => B, set: (A,B) => A) {
         ._2
       case _ => JsUndefined("Element is not an object, couldn't find field "+f)
     }
-  },(_, _) => {
-    JsUndefined("Not implemented yet")
+  }, (repl, whole) => {
+    get(whole) match {
+      case JsObject(fields) => {
+        val found = fields.find(t => t._1 == f) match {
+          case None => false
+          case _ => true
+        }
+        set(JsObject(found match {
+          case false => fields :+ (f -> repl)
+          case true => fields.map{
+            t => t match {
+              case (k: String, v: JsValue) => if(k == f){
+                k -> repl
+              }else{
+                k -> v
+              }
+            }
+          }
+        }), whole)
+      }
+      case _ => {
+        set(JsObject(Seq(f -> repl)), whole)
+      }
+    }
   })
 
-  def \(i: Int) = Lens[A, JsValue](a => {
+  def \(i: Int) = Lens(a => {
     get(a) match {
       case JsArray(fields) => fields
         .lift(i)
@@ -47,7 +71,8 @@ case class Lens[A >: JsValue,B](get: A => B, set: (A,B) => A) {
 }
 
 object Lens {
-  def self[A >:JsValue] = Lens[A, A](a => a, (_, a) => a)
+  def init[JsValue] = Lens(a => a, (a, _) => a)
+  def self[JsValue] = Lens(a => a, (_, a) => a)
 }
 
 /**
