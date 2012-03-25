@@ -11,6 +11,45 @@ import scala.collection._
 import scala.collection.immutable.Stack
 import scala.annotation.tailrec
 
+object Implicits{
+  implicit val string = {(s: String) => JsString(s)}
+}
+
+/**
+ * Lenses
+ */
+
+case class Lens[A >: JsValue,B](get: A => B, set: (A,B) => A) {
+  def apply(whole: A) = get(whole)
+
+  def \(f: String) = Lens[A, JsValue](a => {
+    get(a) match {
+      case JsObject(fields) => fields
+        .find(t => t._1 == f)
+        .getOrElse(("undefined" -> JsUndefined("Field " + f + " not found")))
+        ._2
+      case _ => JsUndefined("Element is not an object, couldn't find field "+f)
+    }
+  },(_, _) => {
+    JsUndefined("Not implemented yet")
+  })
+
+  def \(i: Int) = Lens[A, JsValue](a => {
+    get(a) match {
+      case JsArray(fields) => fields
+        .lift(i)
+        .getOrElse(JsUndefined("Index " + i + " not found"))
+      case _ => JsUndefined("Element is not an array, couldn't find index " + i)
+    }
+  },(_, _) => {
+    JsUndefined("Not implemented yet")
+  })
+}
+
+object Lens {
+  def self[A >:JsValue] = Lens[A, A](a => a, (_, a) => a)
+}
+
 /**
  * Generic json value
  */
