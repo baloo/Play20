@@ -25,29 +25,53 @@ object JsonLensesSpec extends Specification {
 
   "JSONLenses" should {
     "lens.self returns identity" in {
-      Lens.self(article) must equalTo(article)
+      JsValue(article) must equalTo(article)
     }
 
     "lens reads a sub-object" in {
-      (Lens \ "author" \ "firstname")(article) must equalTo(JsString("Bugs"))
+      (JsValue \ "author" \ "firstname")(article) must equalTo(JsString("Bugs"))
+    }
+
+    "lens reads a sub-object with as" in {
+      ((JsValue \ "author" \ "firstname").as[String]).get(article) must equalTo("Bugs")
+    }
+
+    "lens sets a sub-object with as" in {
+      ((JsValue \ "author" \ "firstname").as[String]).set(article,"Koko") must equalTo(JsObject(
+    List(
+      "title" -> JsString("Acme"),
+      "author" -> JsObject(
+        List(
+          "firstname" -> JsString("Koko"),
+          "lastname" -> JsString("Bunny")
+          )
+        ),
+      "tags" -> JsArray(
+        List[JsValue](
+          JsString("Awesome article"),
+          JsString("Must read"),
+          JsString("Playframework"),
+          JsString("Rocks")
+          )
+        )
+      )
+    ))
     }
 
     "lens reads a sub-array" in {
-      (Lens \ "tags" at 0)(article) must equalTo(JsString("Awesome article"))
+      (JsValue \ "tags" at 0)(article) must equalTo(JsString("Awesome article"))
     }
 
     "compose lenses" in {
-      val first = Lens \ "author"
-      val second = Lens \ "firstname"
+      val first =  JsValue \ "author"
+      val second = JsValue \ "firstname"
 
       (second + first)(article) must equalTo(JsString("Bugs"))
     }
 
     "compose lenses and modify" in {
-      val first = Lens \ "author"
-      val second = Lens \ "firstname"
-
-      println((second + first)(article, JsString("Daffy")))
+      val first =  JsValue \ "author"
+      val second = JsValue \ "firstname"
 
       (second + first)(article, JsString("Daffy")) must equalTo(JsObject(
           List(
@@ -81,7 +105,7 @@ object JsonLensesSpec extends Specification {
 
     "set a value in a subobject with lenses" in {
       import play.api.libs.json.Implicits._
-      (Lens \ "author" \ "firstname").set(article, "Daffy") must 
+      (JsValue \ "author" \ "firstname").set(article, "Daffy") must 
         equalTo(JsObject(
           List(
             "title" -> JsString("Acme"),
@@ -106,7 +130,7 @@ object JsonLensesSpec extends Specification {
 
     "set a value outside of an object" in {
       import play.api.libs.json.Implicits._
-      (Lens \ "title" \ "foo")(article, "bar") must equalTo(JsObject(
+      (JsValue \ "title" \ "foo")(article, "bar") must equalTo(JsObject(
         List(
           "title" -> JsObject(
             List(

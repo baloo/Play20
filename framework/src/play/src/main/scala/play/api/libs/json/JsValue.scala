@@ -19,50 +19,66 @@ object Implicits{
  * Lenses
  */
 
-//case class Lens[A <: JsValue, B <: JsValue](get: A => B,
-//                set: (B, A) => A,
-case class Lens(get: JsValue => JsValue,
-                set: (JsValue, JsValue) => JsValue){
+trait Lens[A,B]{
+  def get: A => B
+  def set: (A,B) => A
+}
+
+object Lens {
+  def apply[A,B](getter: A => B,setter: (A, B) => A) = new Lens[A,B] {
+    val get = getter
+    val set = setter
+  }
+}
+
+case class JsValueLens(val get: JsValue => JsValue,
+                val set: (JsValue, JsValue) => JsValue) extends Lens[JsValue,JsValue]{
+
   def apply(whole: JsValue) = get(whole)
 
   def apply(whole: JsValue, repl: JsValue) = set(whole, repl)
 
-  def \(f: String) = Lens(
-    Lens.objectGetter(get)(f),
-    Lens.objectSetter(get)(set)(f))
+  def \(f: String) = JsValueLens(
+    JsValueLens.objectGetter(get)(f),
+    JsValueLens.objectSetter(get)(set)(f))
 
-  def at(i: Int) = Lens(
-    Lens.arrayGetter(get)(i),
-    Lens.arraySetter(get)(set)(i))
+  def at(i: Int) = JsValueLens(
+    JsValueLens.arrayGetter(get)(i),
+    JsValueLens.arraySetter(get)(set)(i))
 
   def mod(whole:JsValue, f: JsValue => JsValue) : JsValue = 
     set(whole, f(get(whole)))
 
-  def compose(o: Lens) = Lens(
+  def compose(o: JsValueLens) = JsValueLens(
     whole => get(o.get(whole)),
     (whole, repl) => o.mod(whole, set(_, repl))
   )
 
-  def +(o: Lens) = compose(o)
+  def +(o: JsValueLens) = compose(o)
+
+  def as[A](implicit format:Format[A]):Lens[JsValue,A] = Lens[JsValue,A](
+    getter = jsValue => format.reads(get(jsValue)), 
+    setter = (me, value) => set(me, format.writes(value)) )
+
 }
 
-object Lens {
-  def self[JsValue] = Lens(a => a, (_, a) => a)
+object JsValueLens {
+  def init = JsValueLens(a => a, (_, a) => a)
+  def self = JsValueLens(a => a, (a, _) => a)
 
-  def \(f: String): Lens = Lens(
+  def \(f: String): JsValueLens = JsValueLens(
     objectGetter(a => a)(f),
     objectSetter(a => a)((_, a) => a)(f)
   )
 
-  def at(i: Int): Lens = Lens(
+  def at(i: Int): JsValueLens = JsValueLens(
     arrayGetter(a => a)(i),
     arraySetter(a => a)((_, a) => a)(i)
   )
 
-  private[Lens] def objectGetter
+  private[JsValueLens] def objectGetter
     (get: JsValue => JsValue)
-    (f: String): (JsValue => JsValue) = (a =>
-      get(a) match {
+    (f: String): (JsValue => JsValue) = (a => get(a) match {
         case JsObject(fields) => fields
           .find(t => t._1 == f)
           .getOrElse(("undefined" -> JsUndefined("Field " + f + " not found")))
@@ -70,7 +86,7 @@ object Lens {
         case _ => JsUndefined("Element is not an object, couldn't find field "+f)
       })
 
-  private[Lens] def arrayGetter
+  private[JsValueLens] def arrayGetter
     (get: JsValue => JsValue)
     (i: Int): (JsValue => JsValue) = (a => {
       get(a) match {
@@ -81,7 +97,7 @@ object Lens {
       }
     })
 
-  private[Lens] def objectSetter
+  private[JsValueLens] def objectSetter
     (get: JsValue => JsValue)
     (set: (JsValue, JsValue) => JsValue)
     (f: String): ((JsValue, JsValue) => JsValue) = (whole, repl) => {
@@ -110,13 +126,14 @@ object Lens {
       }
     }
 
-  private[Lens] def arraySetter
+  private[JsValueLens] def arraySetter
     (get: JsValue => JsValue)
     (set: (JsValue, JsValue) => JsValue)
     (i: Int): ((JsValue, JsValue) => JsValue) = (_, _) => {
       //TODO: Implement setter for arrays
       JsUndefined("Not implemented yet")
     }
+
 
 }
 
