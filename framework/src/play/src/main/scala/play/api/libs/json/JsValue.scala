@@ -55,7 +55,7 @@ case class Lens(get: JsValue => JsValue,
           }
         }), whole)
       }
-      case o => {
+      case _ => {
         set(JsObject(Seq(f -> repl)), whole)
       }
     }
@@ -69,6 +69,7 @@ case class Lens(get: JsValue => JsValue,
       case _ => JsUndefined("Element is not an array, couldn't find index " + i)
     }
   },(_, _) => {
+    //TODO: Implement setter for arrays
     JsUndefined("Not implemented yet")
   })
 }
