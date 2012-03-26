@@ -22,14 +22,12 @@ object Implicits{
 //case class Lens[A <: JsValue, B <: JsValue](get: A => B,
 //                set: (B, A) => A,
 case class Lens(get: JsValue => JsValue,
-                set: (JsValue, JsValue) => JsValue,
-                strategy: Lens.Strategies.Strategy = 
-                  Lens.Strategies.NoChange) {
+                set: (JsValue, JsValue) => JsValue){
   def apply(whole: JsValue) = get(whole)
 
   def apply(whole: JsValue, repl: JsValue) = set(whole, repl)
 
-  def \(f: String, s: Lens.Strategies.Strategy = strategy) = Lens(a => {
+  def \(f: String) = Lens(a => {
     get(a) match {
       case JsObject(fields) => fields
         .find(t => t._1 == f)
@@ -58,12 +56,12 @@ case class Lens(get: JsValue => JsValue,
         }), whole)
       }
       case o => {
-        set(strategy.setObject(o, JsObject(Seq(f -> repl)), f), whole)
+        set(JsObject(Seq(f -> repl)), whole)
       }
     }
-  }, s)
+  })
 
-  def *(i: Int, s: Lens.Strategies.Strategy = strategy) = Lens(a => {
+  def at(i: Int) = Lens(a => {
     get(a) match {
       case JsArray(fields) => fields
         .lift(i)
@@ -72,32 +70,12 @@ case class Lens(get: JsValue => JsValue,
     }
   },(_, _) => {
     JsUndefined("Not implemented yet")
-  }, s)
+  })
 }
 
 object Lens {
   def init[JsValue] = Lens(a => a, (a, _) => a)
   def self[JsValue] = Lens(a => a, (_, a) => a)
-
-  object Strategies {
-    trait Strategy {
-      def getObject(f: String): JsValue = JsUndefined("Undefined field "+f+" in object")
-      def getArray(i: Int): JsValue = JsUndefined("Undefined index "+i+" in array")
-
-      def setObject(from: JsValue, to: JsValue, field: String): JsValue
-      def setArray(from: JsValue, to: JsValue, index: Int): JsValue
-    }
-
-    object NoChange extends Strategy{
-      def setObject(from: JsValue, to: JsValue, field: String) = from
-      def setArray(from: JsValue, to: JsValue, index: Int) = from
-    }
-
-    object FuckThemAll extends Strategy{
-      def setObject(from: JsValue, to: JsValue, field: String) = to
-      def setArray(from: JsValue, to: JsValue, index: Int) = to
-    }
-  }
 }
 
 /**
