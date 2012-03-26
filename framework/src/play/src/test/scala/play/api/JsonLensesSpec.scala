@@ -33,7 +33,7 @@ object JsonLensesSpec extends Specification {
     }
 
     "lens reads a sub-array" in {
-      (Lens.init \ "tags" \ 0)(article) must equalTo(JsString("Awesome article"))
+      (Lens.init \ "tags" * 0)(article) must equalTo(JsString("Awesome article"))
     }
 
     //"set a value with lenses" in {
@@ -69,30 +69,35 @@ object JsonLensesSpec extends Specification {
 
     "set a value outside of an object" in {
       import play.api.libs.json.Implicits._
-      (Lens.init \ "title" \ "foo").set("bar", article) must equalTo(JsObject(
-          List(
-            "title" -> JsObject(
-              List(
-                "foo" -> JsString("bar")
-                )
-              ),
-            "author" -> JsObject(
-              List(
-                "firstname" -> JsString("Bugs"),
-                "lastname" -> JsString("Bunny")
-                )
-              ),
-            "tags" -> JsArray(
-              List[JsValue](
-                JsString("Awesome article"),
-                JsString("Must read"),
-                JsString("Playframework"),
-                JsString("Rocks")
-                )
+      (Lens.init \ "title" \ "foo")("bar", article) must equalTo(article)
+    }
+
+    "set a value outside of an object using an alternative strategy" in {
+      import play.api.libs.json.Implicits._
+      (Lens.init \ ("title", Lens.Strategies.FuckThemAll) \"foo")("bar", article) must equalTo(JsObject(
+        List(
+          "title" -> JsObject(
+            List(
+              "foo" -> JsString("bar")
+              )
+            ),
+          "author" -> JsObject(
+            List(
+              "firstname" -> JsString("Bugs"),
+              "lastname" -> JsString("Bunny")
+              )
+            ),
+          "tags" -> JsArray(
+            List[JsValue](
+              JsString("Awesome article"),
+              JsString("Must read"),
+              JsString("Playframework"),
+              JsString("Rocks")
               )
             )
           )
         )
+      )
     }
 
 //    "mask -whitelist- an object" in {
