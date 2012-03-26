@@ -32,5 +32,5 @@ package play.api.libs
  * }}}
  */
 package object json {
-
+  val JsValue = JsValueLens.init
 }

@@ -19,15 +19,26 @@ object Implicits{
  * Lenses
  */
 
-//case class Lens[A <: JsValue, B <: JsValue](get: A => B,
-//                set: (B, A) => A,
-case class Lens(get: JsValue => JsValue,
-                set: (JsValue, JsValue) => JsValue){
+trait Lens[A,B]{
+  def get: A => B
+  def set: (B,A) => A
+}
+
+object Lens {
+  def apply[A,B](getter: A => B,setter: (B, A) => A) = new Lens[A,B] {
+    val get = getter
+    val set = setter
+  }
+}
+
+case class JsValueLens(val get: JsValue => JsValue,
+                val set: (JsValue, JsValue) => JsValue) extends Lens[JsValue,JsValue]{
+
   def apply(whole: JsValue) = get(whole)
 
   def apply(whole: JsValue, repl: JsValue) = set(whole, repl)
 
-  def \(f: String) = Lens(a => {
+  def \ (f: String) = JsValueLens(a => {
     get(a) match {
       case JsObject(fields) => fields
         .find(t => t._1 == f)
@@ -61,7 +72,7 @@ case class Lens(get: JsValue => JsValue,
     }
   })
 
-  def at(i: Int) = Lens(a => {
+  def at(i: Int) = JsValueLens(a => {
     get(a) match {
       case JsArray(fields) => fields
         .lift(i)
@@ -72,12 +83,16 @@ case class Lens(get: JsValue => JsValue,
     //TODO: Implement setter for arrays
     JsUndefined("Not implemented yet")
   })
+
+  def as[A](implicit format:Format[A]):Lens[JsValue,A] = Lens[JsValue,A](getter = jsValue => format.reads(get(jsValue)), setter = (value,me) => set(format.writes(value),me) )
+
 }
 
-object Lens {
-  def init[JsValue] = Lens(a => a, (a, _) => a)
-  def self[JsValue] = Lens(a => a, (_, a) => a)
+object JsValueLens {
+  def init = JsValueLens(a => a, (a, _) => a)
+  def self = JsValueLens(a => a, (_, a) => a)
 }
+
 
 /**
  * Generic json value

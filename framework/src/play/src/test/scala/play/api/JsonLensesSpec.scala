@@ -25,15 +25,41 @@ object JsonLensesSpec extends Specification {
 
   "JSONLenses" should {
     "lens.self returns identity" in {
-      Lens.init(article) must equalTo(article)
+      JsValue(article) must equalTo(article)
     }
 
     "lens reads a sub-object" in {
-      (Lens.init \ "author" \ "firstname")(article) must equalTo(JsString("Bugs"))
+      (JsValue \ "author" \ "firstname")(article) must equalTo(JsString("Bugs"))
+    }
+
+    "lens reads a sub-object with as" in {
+      ((JsValue \ "author" \ "firstname").as[String]).get(article) must equalTo("Bugs")
+    }
+
+    "lens sets a sub-object with as" in {
+      ((JsValue \ "author" \ "firstname").as[String]).set("Koko",article) must equalTo(JsObject(
+    List(
+      "title" -> JsString("Acme"),
+      "author" -> JsObject(
+        List(
+          "firstname" -> JsString("Koko"),
+          "lastname" -> JsString("Bunny")
+          )
+        ),
+      "tags" -> JsArray(
+        List[JsValue](
+          JsString("Awesome article"),
+          JsString("Must read"),
+          JsString("Playframework"),
+          JsString("Rocks")
+          )
+        )
+      )
+    ))
     }
 
     "lens reads a sub-array" in {
-      (Lens.init \ "tags" at 0)(article) must equalTo(JsString("Awesome article"))
+      (JsValue \ "tags" at 0)(article) must equalTo(JsString("Awesome article"))
     }
 
     //"set a value with lenses" in {
@@ -44,7 +70,7 @@ object JsonLensesSpec extends Specification {
 
     "set a value in a subobject with lenses" in {
       import play.api.libs.json.Implicits._
-      (Lens.init \ "author" \ "firstname").set("Daffy", article) must 
+      (JsValue \ "author" \ "firstname").set("Daffy", article) must 
         equalTo(JsObject(
           List(
             "title" -> JsString("Acme"),
@@ -69,7 +95,7 @@ object JsonLensesSpec extends Specification {
 
     "set a value outside of an object" in {
       import play.api.libs.json.Implicits._
-      (Lens.init \ "title" \ "foo")("bar", article) must equalTo(JsObject(
+      (JsValue \ "title" \ "foo")("bar", article) must equalTo(JsObject(
         List(
           "title" -> JsObject(
             List(
