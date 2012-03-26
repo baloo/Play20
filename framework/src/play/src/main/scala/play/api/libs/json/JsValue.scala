@@ -27,56 +27,97 @@ case class Lens(get: JsValue => JsValue,
 
   def apply(whole: JsValue, repl: JsValue) = set(whole, repl)
 
-  def \(f: String) = Lens(a => {
-    get(a) match {
-      case JsObject(fields) => fields
-        .find(t => t._1 == f)
-        .getOrElse(("undefined" -> JsUndefined("Field " + f + " not found")))
-        ._2
-      case _ => JsUndefined("Element is not an object, couldn't find field "+f)
-    }
-  }, (repl, whole) => {
-    get(whole) match {
-      case JsObject(fields) => {
-        val found = fields.find(t => t._1 == f) match {
-          case None => false
-          case _ => true
-        }
-        set(JsObject(found match {
-          case false => fields :+ (f -> repl)
-          case true => fields.map{
-            t => t match {
-              case (k: String, v: JsValue) => if(k == f){
-                k -> repl
-              }else{
-                k -> v
-              }
-            }
-          }
-        }), whole)
-      }
-      case _ => {
-        set(JsObject(Seq(f -> repl)), whole)
-      }
-    }
-  })
+  def \(f: String) = Lens(
+    Lens.objectGetter(get)(f),
+    Lens.objectSetter(get)(set)(f))
 
-  def at(i: Int) = Lens(a => {
-    get(a) match {
-      case JsArray(fields) => fields
-        .lift(i)
-        .getOrElse(JsUndefined("Index " + i + " not found"))
-      case _ => JsUndefined("Element is not an array, couldn't find index " + i)
-    }
-  },(_, _) => {
-    //TODO: Implement setter for arrays
-    JsUndefined("Not implemented yet")
-  })
+  def at(i: Int) = Lens(
+    Lens.arrayGetter(get)(i),
+    Lens.arraySetter(get)(set)(i))
+
+  def mod(whole:JsValue, f: JsValue => JsValue) : JsValue = 
+    set(whole, f(get(whole)))
+
+  def compose(o: Lens) = Lens(
+    whole => get(o.get(whole)),
+    (whole, repl) => o.mod(whole, set(_, repl))
+  )
+
+  def +(o: Lens) = compose(o)
 }
 
 object Lens {
-  def init[JsValue] = Lens(a => a, (a, _) => a)
   def self[JsValue] = Lens(a => a, (_, a) => a)
+
+  def \(f: String): Lens = Lens(
+    objectGetter(a => a)(f),
+    objectSetter(a => a)((_, a) => a)(f)
+  )
+
+  def at(i: Int): Lens = Lens(
+    arrayGetter(a => a)(i),
+    arraySetter(a => a)((_, a) => a)(i)
+  )
+
+  private[Lens] def objectGetter
+    (get: JsValue => JsValue)
+    (f: String): (JsValue => JsValue) = (a =>
+      get(a) match {
+        case JsObject(fields) => fields
+          .find(t => t._1 == f)
+          .getOrElse(("undefined" -> JsUndefined("Field " + f + " not found")))
+          ._2
+        case _ => JsUndefined("Element is not an object, couldn't find field "+f)
+      })
+
+  private[Lens] def arrayGetter
+    (get: JsValue => JsValue)
+    (i: Int): (JsValue => JsValue) = (a => {
+      get(a) match {
+        case JsArray(fields) => fields
+          .lift(i)
+          .getOrElse(JsUndefined("Index " + i + " not found"))
+        case _ => JsUndefined("Element is not an array, couldn't find index " + i)
+      }
+    })
+
+  private[Lens] def objectSetter
+    (get: JsValue => JsValue)
+    (set: (JsValue, JsValue) => JsValue)
+    (f: String): ((JsValue, JsValue) => JsValue) = (whole, repl) => {
+      get(whole) match {
+        case JsObject(fields) => {
+          val found = fields.find(t => t._1 == f) match {
+            case None => false
+            case _ => true
+          }
+          set(whole, JsObject(found match {
+            case false => fields :+ (f -> repl)
+            case true => fields.map{
+              t => t match {
+                case (k: String, v: JsValue) => if(k == f){
+                  k -> repl
+                }else{
+                  k -> v
+                }
+              }
+            }
+          }))
+        }
+        case _ => {
+          set(whole, JsObject(Seq(f -> repl)))
+        }
+      }
+    }
+
+  private[Lens] def arraySetter
+    (get: JsValue => JsValue)
+    (set: (JsValue, JsValue) => JsValue)
+    (i: Int): ((JsValue, JsValue) => JsValue) = (_, _) => {
+      //TODO: Implement setter for arrays
+      JsUndefined("Not implemented yet")
+    }
+
 }
 
 /**
