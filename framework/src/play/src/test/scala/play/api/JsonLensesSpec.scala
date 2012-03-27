@@ -216,6 +216,47 @@ object JsonLensesSpec extends Specification {
       )
     }
 
+    "selectAll strings in article" in {
+      JsValueLens.init
+      .selectAll(article, a => a match {
+        case JsString(_) => true
+        case _ => false
+        })
+       .map(t => t._2) must equalTo(Seq(
+         "Acme", "Bugs", "Bunny", "Awesome article", "Must read",
+         "Playframework", "Rocks"
+       ).map(t => JsString(t)))
+    }
+
+    "suffix all strings with a space" in {
+      JsValueLens.init \\ (article, a => a match {
+        case JsString(_) => true
+        case _ => false
+        }, a => a match {
+          case JsString(s) => JsString(s + " ")
+          case o => o
+        }) must equalTo(JsObject(
+          List(
+            "title" -> JsString("Acme "),
+            "author" -> JsObject(
+              List(
+                "firstname" -> JsString("Bugs "),
+                "lastname" -> JsString("Bunny ")
+                )
+              ),
+            "tags" -> JsArray(
+              List[JsValue](
+                JsString("Awesome article "),
+                JsString("Must read "),
+                JsString("Playframework "),
+                JsString("Rocks ")
+                )
+              )
+            )
+          )
+        )
+    }
+
 //    "mask -whitelist- an object" in {
 //      article &&& List("title", "author") > "tags" get must equalTo(JsUndefined)
 //    }

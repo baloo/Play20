@@ -110,8 +110,55 @@ case class JsValueLens(getter: JsValue => JsValue,
         }
       })
 
-  
+  def selectAll(whole: JsValue, selector: JsValue => Boolean): Seq[(JsValueLens,
+  JsValue)] = {
+    val baseLens = JsValueLens.init
 
+    val elements = if(selector(whole)){
+      Seq(baseLens -> whole)
+    } else {
+      Nil
+    }
+
+    elements ++ (whole match {
+      case JsObject(fields) => {
+        fields.flatMap{ tuple => {
+            val lens = baseLens \ tuple._1
+
+            lens.selectAll(tuple._2, selector).map{
+              t => ((lens andThen t._1) -> t._2)
+            }
+          }
+        }
+      }
+      case JsArray(fields) => {
+        val baseLens = JsValueLens.init
+        fields.zipWithIndex.flatMap{ 
+          tuple => {
+            val lens = baseLens at tuple._2
+
+            lens.selectAll(tuple._1, selector).map{
+              t => ((lens andThen t._1) -> t._2)
+            }
+          }
+        }
+      }
+      case _ => Nil
+    })
+  }
+
+  def \\(whole: JsValue,
+         selector: JsValue => Boolean,
+         cb: JsValue => JsValue): JsValue = {
+    val elements = selectAll(whole, selector)
+
+    elements.foldLeft(whole)((acc, t) => {
+      val lens = t._1
+      val previous = t._2
+
+      lens.set(acc, cb(previous))
+      })
+  }
 }
 
 object JsValueLens {
