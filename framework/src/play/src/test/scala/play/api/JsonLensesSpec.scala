@@ -62,6 +62,36 @@ object JsonLensesSpec extends Specification {
       ((JsValue \ "author" \ "non-existant").as[String]).get(article) must throwAn[RuntimeException]
     }
 
+    "lens outside a sub-object with asEither returns Left('some error')" in {
+      ((JsValue \ "author" \ "non-existant").asEither[String]).get(article) must
+        equalTo(Left[String, String]("Field non-existant not found"))
+    }
+
+    "lens sets a sub-object with asEither with Right(String)" in {
+      (((JsValue \ "author" \ "login")
+        .asEither[String]).set(article, Right[String,String]("bbunny"))) must
+        equalTo(JsObject(
+          List(
+            "title" -> JsString("Acme"),
+            "author" -> JsObject(
+              List(
+                "firstname" -> JsString("Bugs"),
+                "lastname" -> JsString("Bunny"),
+                "login" -> JsString("bbunny")
+                )
+              ),
+            "tags" -> JsArray(
+              List[JsValue](
+                JsString("Awesome article"),
+                JsString("Must read"),
+                JsString("Playframework"),
+                JsString("Rocks")
+                )
+              )
+            )
+          ))
+    }
+
     "lens outside a sub-object with asOpt returns None" in {
       ((JsValue \ "author" \ "non-existant").asOpt[String]).get(article) must equalTo(None)
     }
@@ -87,9 +117,6 @@ object JsonLensesSpec extends Specification {
       )
     ))
     }
-
-
-
 
     "lens reads a sub-array" in {
       (JsValue \ "tags" at 0)(article) must equalTo(JsString("Awesome article"))

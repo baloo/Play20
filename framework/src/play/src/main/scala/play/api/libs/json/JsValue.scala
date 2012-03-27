@@ -86,15 +86,31 @@ case class JsValueLens(getter: JsValue => JsValue,
     getter = jsValue => format.reads(get(jsValue)), 
     setter = (me, value) => set(me, format.writes(value)) )
 
-  def asOpt[A](implicit format:Format[A]):Lens[JsValue,Option[A]] = Lens[JsValue,Option[A]](
+  def asEither[A](implicit format:Format[A]): Lens[JsValue,Either[String, A]] = Lens[JsValue,Either[String, A]](
     getter = jsValue => get(jsValue) match {
-      case _: JsUndefined => None
-      case e => Some(format.reads(e))
+      case JsUndefined(e) => Left(e)
+      case e => Right(format.reads(e))
     },
     setter = (me, value) => value match {
-      case None => me
-      case Some(e) => set(me, format.writes(e))
+      case Left(_) => me
+      case Right(v) => set(me, format.writes(v))
     })
+
+  def asOpt[A](implicit format:Format[A]): Lens[JsValue,Option[A]] =
+    this.asEither andThen Lens[Either[String,A],Option[A]](
+      getter = jsValue => jsValue match {
+        case Left(_) => None
+        case Right(v) => Some(v)
+      },
+      setter = (me, value) => value match {
+        case None => me
+        case Some(v) => me match {
+          case l if l.isLeft => l
+          case Right(_) => Right[String,A](v)
+        }
+      })
+
+  
 
 }
 
