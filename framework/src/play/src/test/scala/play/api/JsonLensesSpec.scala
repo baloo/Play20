@@ -156,13 +156,6 @@ object JsonLensesSpec extends Specification {
  
     }
 
-
-    //"set a value with lenses" in {
-    //  import play.api.libs.json.Implicits._
-    //  (Lens.self \ "title")((Lens.self \ "title").set(article,"Acme More")) must 
-    //    equalTo(JsString("Acme More"))
-    //}
-
     "set a value in a subobject with lenses" in {
       import play.api.libs.json.Implicits._
       (JsValue \ "author" \ "firstname").set(article, "Daffy") must 
