@@ -221,6 +221,17 @@ object JsonLensesSpec extends Specification {
        ).map(t => JsString(t)))
     }
 
+    "selectAll strings with max depth 1 in article" in {
+      JsValueLens.init
+      .selectAll(article, a => a match {
+        case JsString(_) => true
+        case _ => false
+        }, 1)
+       .map(t => t._2) must equalTo(Seq(
+         "Acme"
+       ).map(t => JsString(t)))
+    }
+
     "suffix all strings with a space" in {
       JsValueLens.init \\ (article, a => a match {
         case JsString(_) => true
