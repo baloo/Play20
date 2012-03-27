@@ -58,6 +58,39 @@ object JsonLensesSpec extends Specification {
     ))
     }
 
+    "lens outside a sub-object with as throws exceptions" in {
+      ((JsValue \ "author" \ "non-existant").as[String]).get(article) must throwAn[RuntimeException]
+    }
+
+    "lens outside a sub-object with asOpt returns None" in {
+      ((JsValue \ "author" \ "non-existant").asOpt[String]).get(article) must equalTo(None)
+    }
+
+    "lens sets a sub-object with asOpt with Some(String)" in {
+      ((JsValue \ "author" \ "firstname").asOpt[String]).set(article,Some("Elmer")) must equalTo(JsObject(
+    List(
+      "title" -> JsString("Acme"),
+      "author" -> JsObject(
+        List(
+          "firstname" -> JsString("Elmer"),
+          "lastname" -> JsString("Bunny")
+          )
+        ),
+      "tags" -> JsArray(
+        List[JsValue](
+          JsString("Awesome article"),
+          JsString("Must read"),
+          JsString("Playframework"),
+          JsString("Rocks")
+          )
+        )
+      )
+    ))
+    }
+
+
+
+
     "lens reads a sub-array" in {
       (JsValue \ "tags" at 0)(article) must equalTo(JsString("Awesome article"))
     }

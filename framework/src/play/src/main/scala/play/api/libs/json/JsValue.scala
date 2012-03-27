@@ -82,10 +82,19 @@ case class JsValueLens(getter: JsValue => JsValue,
     JsValueLens.arrayGetter(get)(i),
     JsValueLens.arraySetter(get)(set)(i))
 
-
   def as[A](implicit format:Format[A]):Lens[JsValue,A] = Lens[JsValue,A](
     getter = jsValue => format.reads(get(jsValue)), 
     setter = (me, value) => set(me, format.writes(value)) )
+
+  def asOpt[A](implicit format:Format[A]):Lens[JsValue,Option[A]] = Lens[JsValue,Option[A]](
+    getter = jsValue => get(jsValue) match {
+      case _: JsUndefined => None
+      case e => Some(format.reads(e))
+    },
+    setter = (me, value) => value match {
+      case None => me
+      case Some(e) => set(me, format.writes(e))
+    })
 
 }
 
