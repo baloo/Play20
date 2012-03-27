@@ -182,9 +182,22 @@ object JsValueLens {
   private[JsValueLens] def arraySetter
     (get: JsValue => JsValue)
     (set: (JsValue, JsValue) => JsValue)
-    (i: Int): ((JsValue, JsValue) => JsValue) = (_, _) => {
-      //TODO: Implement setter for arrays
-      JsUndefined("Not implemented yet")
+    (i: Int): ((JsValue, JsValue) => JsValue) = (whole, repl) => {
+      get(whole) match {
+        case JsArray(fields) => {
+          val found = fields.lift(i) match {
+            case None => false
+            case _ => true
+          }
+          set(whole, JsArray(found match {
+            case false => fields :+ repl
+            case true => fields.patch(i, Seq(repl), 1)
+          }))
+        }
+        case _ => {
+          set(whole, JsArray(Seq(repl)))
+        }
+      }
     }
 
 
