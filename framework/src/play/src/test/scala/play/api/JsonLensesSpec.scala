@@ -66,14 +66,14 @@ object JsonLensesSpec extends Specification {
       val first =  JsValue \ "author"
       val second = JsValue \ "firstname"
 
-      (second + first)(article) must equalTo(JsString("Bugs"))
+      (first andThen second).apply(article) must equalTo(JsString("Bugs"))
     }
 
     "compose lenses and modify" in {
       val first =  JsValue \ "author"
       val second = JsValue \ "firstname"
 
-      (second + first)(article, JsString("Daffy")) must equalTo(JsObject(
+      (first andThen second).apply(article, JsString("Daffy")) must equalTo(JsObject(
           List(
             "title" -> JsString("Acme"),
             "author" -> JsObject(

@@ -20,19 +20,55 @@ object Implicits{
  */
 
 trait Lens[A,B]{
+  self =>
+
   def get: A => B
   def set: (A,B) => A
+
+  def mod(a:A, f: B => B) : A = set(a, f(get(a)))
+
+  def compose[C,L <: Lens[C,B]](that: Lens[C,A])(implicit cons:LensConstructor[C,B,L]):L = cons(
+    c => get(that.get(c)),
+    (c, b) => that.mod(c, set(_, b))
+  )
+
+  def andThen[C,L <: Lens[A,C]](o: Lens[B,C])(implicit cons:LensConstructor[A,C,L]) = o.compose(self)(cons)
+
+}
+
+trait LensConstructor[A,B,L <: Lens[A,B]] extends (( A => B, (A,B) => A) => L)
+
+trait PriorityOne {
+  implicit def lens[A,B,L <: Lens[A,B]] = new LensConstructor[A,B,Lens[A,B]] {
+
+    def apply(get: A => B,
+              set: (A, B) => A) = Lens(get,set)
+
+  }
+}
+
+object LensConstructor extends PriorityOne {
+
+  implicit val jsValueLens = new LensConstructor[JsValue,JsValue,JsValueLens] {
+
+    def apply(get: JsValue => JsValue,
+              set: (JsValue, JsValue) => JsValue) = JsValueLens(get,set)
+
+  }
 }
 
 object Lens {
   def apply[A,B](getter: A => B,setter: (A, B) => A) = new Lens[A,B] {
-    val get = getter
-    val set = setter
+    def get = getter
+    def set = setter
   }
 }
 
-case class JsValueLens(val get: JsValue => JsValue,
-                val set: (JsValue, JsValue) => JsValue) extends Lens[JsValue,JsValue]{
+case class JsValueLens(getter: JsValue => JsValue,
+                setter: (JsValue, JsValue) => JsValue) extends Lens[JsValue,JsValue]{
+
+  def get = getter
+  def set = setter               
 
   def apply(whole: JsValue) = get(whole)
 
@@ -46,15 +82,6 @@ case class JsValueLens(val get: JsValue => JsValue,
     JsValueLens.arrayGetter(get)(i),
     JsValueLens.arraySetter(get)(set)(i))
 
-  def mod(whole:JsValue, f: JsValue => JsValue) : JsValue = 
-    set(whole, f(get(whole)))
-
-  def compose(o: JsValueLens) = JsValueLens(
-    whole => get(o.get(whole)),
-    (whole, repl) => o.mod(whole, set(_, repl))
-  )
-
-  def +(o: JsValueLens) = compose(o)
 
   def as[A](implicit format:Format[A]):Lens[JsValue,A] = Lens[JsValue,A](
     getter = jsValue => format.reads(get(jsValue)), 
@@ -79,10 +106,11 @@ object JsValueLens {
   private[JsValueLens] def objectGetter
     (get: JsValue => JsValue)
     (f: String): (JsValue => JsValue) = (a => get(a) match {
-        case JsObject(fields) => fields
-          .find(t => t._1 == f)
-          .getOrElse(("undefined" -> JsUndefined("Field " + f + " not found")))
-          ._2
+        case JsObject(fields) => 
+          fields
+            .find(t => t._1 == f)
+            .getOrElse(("undefined" -> JsUndefined("Field " + f + " not found")))
+            ._2
         case _ => JsUndefined("Element is not an object, couldn't find field "+f)
       })
 
@@ -302,7 +330,7 @@ private[json] class JsValueSerializer extends JsonSerializer[JsValue] {
       case JsArray(elements) => json.writeObject(elements)
       case JsObject(values) => {
         json.writeStartObject()
-        values.foreach { t =>
+        values.filterNot( _.isInstanceOf[JsUndefined]).foreach { t =>
           json.writeFieldName(t._1)
           json.writeObject(t._2)
         }
@@ -311,7 +339,6 @@ private[json] class JsValueSerializer extends JsonSerializer[JsValue] {
       case JsNull => json.writeNull()
       case JsUndefined(error) => {
         play.Logger.warn("Serializing an object with an undefined property: " + error)
-        json.writeNull()
       }
     }
   }
