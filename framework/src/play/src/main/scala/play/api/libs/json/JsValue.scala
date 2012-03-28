@@ -110,50 +110,12 @@ case class JsValueLens(getter: JsValue => JsValue,
         }
       })
 
-  def selectAll(whole: JsValue, selector: JsValue => Boolean, depth: Int = Int.MaxValue): Seq[(JsValueLens,
-  JsValue)] = {
-    val baseLens = JsValueLens.init
-
-    val elements = if(selector(whole)){
-      Seq(baseLens -> whole)
-    } else {
-      Nil
-    }
-
-    depth match {
-      case v if v <= 0 => elements
-      case _ => elements ++ (whole match {
-        case JsObject(fields) => {
-          fields.flatMap{ tuple => {
-              val lens = baseLens \ tuple._1
-
-              lens.selectAll(tuple._2, selector, depth - 1).map{
-                t => ((lens andThen t._1) -> t._2)
-              }
-            }
-          }
-        }
-        case JsArray(fields) => {
-          val baseLens = JsValueLens.init
-          fields.zipWithIndex.flatMap{ 
-            tuple => {
-              val lens = baseLens at tuple._2
-
-              lens.selectAll(tuple._1, selector, depth - 1).map{
-                t => ((lens andThen t._1) -> t._2)
-              }
-            }
-          }
-        }
-        case _ => Nil
-      })
-    }
-  }
-
   def \\(whole: JsValue,
          selector: JsValue => Boolean,
          cb: JsValue => JsValue): JsValue = {
-    val elements = selectAll(whole, selector)
+    val elements = JsValueLens.selectAll(get(whole), selector).map{
+      t => ((this andThen t._1) -> t._2)
+    }
 
     elements.foldLeft(whole)((acc, t) => {
       val lens = t._1
@@ -250,6 +212,45 @@ object JsValueLens {
       }
     }
 
+  def selectAll(whole: JsValue, selector: JsValue => Boolean, depth: Int = Int.MaxValue): Seq[(JsValueLens,
+  JsValue)] = {
+    val baseLens = JsValueLens.init
+
+    val elements = if(selector(whole)){
+      Seq(baseLens -> whole)
+    } else {
+      Nil
+    }
+
+    depth match {
+      case v if v <= 0 => elements
+      case _ => elements ++ (whole match {
+        case JsObject(fields) => {
+          fields.flatMap{ tuple => {
+              val lens = baseLens \ tuple._1
+
+              JsValueLens.selectAll(tuple._2, selector, depth - 1).map{
+                t => ((lens andThen t._1) -> t._2)
+              }
+            }
+          }
+        }
+        case JsArray(fields) => {
+          val baseLens = JsValueLens.init
+          fields.zipWithIndex.flatMap{ 
+            tuple => {
+              val lens = baseLens at tuple._2
+
+              JsValueLens.selectAll(tuple._1, selector, depth - 1).map{
+                t => ((lens andThen t._1) -> t._2)
+              }
+            }
+          }
+        }
+        case _ => Nil
+      })
+    }
+  }
 
 }
 

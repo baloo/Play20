@@ -210,8 +210,7 @@ object JsonLensesSpec extends Specification {
     }
 
     "selectAll strings in article" in {
-      JsValueLens.init
-      .selectAll(article, a => a match {
+      JsValueLens.selectAll(article, a => a match {
         case JsString(_) => true
         case _ => false
         })
@@ -222,8 +221,7 @@ object JsonLensesSpec extends Specification {
     }
 
     "selectAll strings with max depth 1 in article" in {
-      JsValueLens.init
-      .selectAll(article, a => a match {
+      JsValueLens.selectAll(article, a => a match {
         case JsString(_) => true
         case _ => false
         }, 1)
@@ -254,6 +252,37 @@ object JsonLensesSpec extends Specification {
                 JsString("Must read "),
                 JsString("Playframework "),
                 JsString("Rocks ")
+                )
+              )
+            )
+          )
+        )
+    }
+
+    "make all tags as subobjects" in {
+      JsValue \ "tags" \\ (
+        article,
+        a => a match {
+          case JsString(_) => true
+          case _ => false
+        }, a => a match {
+          case JsString(s) => JsObject(List("name" -> JsString(s)))
+          case o => o
+        }) must equalTo(JsObject(
+          List(
+            "title" -> JsString("Acme"),
+            "author" -> JsObject(
+              List(
+                "firstname" -> JsString("Bugs"),
+                "lastname" -> JsString("Bunny")
+                )
+              ),
+            "tags" -> JsArray(
+              List[JsValue](
+                JsObject(List("name" -> JsString("Awesome article"))),
+                JsObject(List("name" -> JsString("Must read"))),
+                JsObject(List("name" -> JsString("Playframework"))),
+                JsObject(List("name" -> JsString("Rocks")))
                 )
               )
             )
