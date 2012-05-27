@@ -1,6 +1,5 @@
 package play.api.libs.json
 
-
 /**
  * Lenses
  */
@@ -19,7 +18,6 @@ trait Lens[A,B]{
   )
 
   def andThen[C,L <: Lens[A,C]](o: Lens[B,C])(implicit cons:LensConstructor[A,C,L]) = o.compose(self)(cons)
-
 }
 
 trait LensConstructor[A,B,L <: Lens[A,B]] extends (( A => B, (A,B) => A) => L)
@@ -58,18 +56,34 @@ case class SeqJsLens(
   def get = getter
   def set = setter
 
-  def apply(whole: JsValue): Seq[JsValue] = this.map(whole)
+  /**
+   * Apply Lens and reapply item to every generated lenses
+   */
+  def apply(whole: JsValue): Seq[JsValue] = this.map(whole)(_ get whole)
 
+  /**
+   * Apply Lens and prune to all generated JsLens
+   */
   def prune(whole: JsValue): JsValue = this.foldLeft(whole){
     (acc, el) => el prune acc
   }
 
+  /**
+   * Apply Lens and set element to all generated JsLens
+   */
   def set(whole: JsValue, replace: JsValue) = this.foldLeft(whole) {
     (acc, el) => el set (acc, replace)
   }
 
-  def map(whole: JsValue): Seq[JsValue] = get(whole).map(_ get whole)
+  /**
+   * Apply and map the callback
+   */
+  def map(whole: JsValue)(callback: JsLens => JsValue): Seq[JsValue] = 
+    get(whole).map(callback)
 
+  /**
+   * Apply and fold the callback
+   */
   def foldLeft(whole: JsValue)(callback: (JsValue, JsLens) => JsValue) =
     get(whole).foldLeft(whole){
       (acc, el) => callback(acc, el)
