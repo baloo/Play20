@@ -139,6 +139,7 @@ case class JsLens(getter: JsValue => JsValue,
           elements.foldLeft(List[JsLens]()){
             (acc, e) => acc ++ recursiveFind(e, key)
           }.zipWithIndex.map{
+            // Rebase all children lenses upon this one
             case (sublens, i) => JsLens at i andThen sublens
           }
         }
@@ -163,7 +164,8 @@ case class JsLens(getter: JsValue => JsValue,
           // current one
           case e => this andThen e
         }),
-      (a,b) => a
+      // This is an identity setter
+      (a,_) => a
     )
   }
 
