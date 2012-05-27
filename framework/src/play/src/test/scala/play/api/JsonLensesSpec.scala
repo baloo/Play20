@@ -157,8 +157,7 @@ object JsonLensesSpec extends Specification {
     }
 
     "set a value in a subobject with lenses" in {
-      import play.api.libs.json.Implicits._
-      (JsValue \ "author" \ "firstname").set(article, "Daffy") must 
+      (JsValue \ "author" \ "firstname").set(article, JsString("Daffy")) must 
         equalTo(JsObject(
           List(
             "title" -> JsString("Acme"),
@@ -182,8 +181,7 @@ object JsonLensesSpec extends Specification {
     }
 
     "set a value outside of an object" in {
-      import play.api.libs.json.Implicits._
-      (JsValue \ "title" \ "foo")(article, "bar") must equalTo(JsObject(
+      (JsValue \ "title" \ "foo")(article, JsString("bar")) must equalTo(JsObject(
         List(
           "title" -> JsObject(
             List(
@@ -210,7 +208,7 @@ object JsonLensesSpec extends Specification {
     }
 
     "selectAll strings in article" in {
-      JsValueLens.selectAll(article, a => a match {
+      JsLens.selectAll(article, a => a match {
         case JsString(_) => true
         case _ => false
         })
@@ -221,7 +219,7 @@ object JsonLensesSpec extends Specification {
     }
 
     "selectAll strings with max depth 1 in article" in {
-      JsValueLens.selectAll(article, a => a match {
+      JsLens.selectAll(article, a => a match {
         case JsString(_) => true
         case _ => false
         }, 1)
@@ -230,8 +228,73 @@ object JsonLensesSpec extends Specification {
        ).map(t => JsString(t)))
     }
 
+    "prune author" in {
+      JsLens.self \ "author" prune (article) must equalTo(
+        JsObject(
+          List(
+            "title" -> JsString("Acme"),
+            "tags" -> JsArray(
+              List[JsValue](
+                JsString("Awesome article"),
+                JsString("Must read"),
+                JsString("Playframework"),
+                JsString("Rocks")
+                )
+              )
+            )
+          )
+      )
+    }
+
+    "mongo operator from lens" in {
+      def mongoPrune(js: JsLens): JsValue = {
+        val lens = (js).set(JsNull, JsNumber(1))
+        lazy val mongoflatten: JsValue => JsObject = value => value match {
+          case JsObject(elements) => 
+            val next = mongoflatten(elements.head._2)
+            if (next.fields.head._1 == "")
+              JsObject(List(elements.head._1 -> next.fields.head._2))
+            else
+              JsObject(List(elements.head._1 + "." + next.fields.head._1 -> next.fields.head._2))
+
+          //case JsArray(elements) => List(Left("0")) ++ mongoflatten(elements.head)
+          case l => JsObject(List(""->l))
+        }
+
+        JsObject(List("$unset" -> mongoflatten(lens)))
+      }
+
+      val lens = JsLens.self \ "author" \ "firstname"
+
+      Json.stringify(mongoPrune(lens)) must
+        equalTo("""{"$unset":{"author.firstname":1}}""")
+    }
+
+    "prune author firstname" in {
+      JsLens.self \ "author" \ "firstname" prune (article) must equalTo(
+        JsObject(
+          List(
+            "title" -> JsString("Acme"),
+            "author" -> JsObject(
+              List(
+                "lastname" -> JsString("Bunny")
+                )
+              ),
+            "tags" -> JsArray(
+              List[JsValue](
+                JsString("Awesome article"),
+                JsString("Must read"),
+                JsString("Playframework"),
+                JsString("Rocks")
+                )
+              )
+            )
+          )
+      )
+    }
+
     "suffix all strings with a space" in {
-      JsValueLens.init \\ (article, a => a match {
+      JsLens.self \\ (article, a => a match {
         case JsString(_) => true
         case _ => false
         }, a => a match {
@@ -288,6 +351,92 @@ object JsonLensesSpec extends Specification {
             )
           )
         )
+    }
+
+    "Prune a composed lens" in {
+      val first = JsLens \ "tags" at 0
+      val second = JsLens \ "name"
+
+      val lens = first andThen second
+      val alternativeArticles = JsObject(List(
+            "title" -> JsString("Acme"),
+            "author" -> JsObject(
+              List(
+                "firstname" -> JsString("Bugs"),
+                "lastname" -> JsString("Bunny")
+                )
+              ),
+            "tags" -> JsArray(
+              List[JsValue](
+                JsObject(List("name" -> JsString("Awesome article"))),
+                JsObject(List("name" -> JsString("Must read"))),
+                JsObject(List("name" -> JsString("Playframework"))),
+                JsObject(List("name" -> JsString("Rocks")))
+                )
+              )
+            )
+          )
+
+      lens.prune(alternativeArticles) must equalTo(
+        JsObject(List(
+          "title" -> JsString("Acme"),
+          "author" -> JsObject(
+            List(
+              "firstname" -> JsString("Bugs"),
+              "lastname" -> JsString("Bunny")
+              )
+            ),
+          "tags" -> JsArray(
+            List[JsValue](
+              JsObject(List()),
+              JsObject(List("name" -> JsString("Must read"))),
+              JsObject(List("name" -> JsString("Playframework"))),
+              JsObject(List("name" -> JsString("Rocks")))
+              )
+            )
+          )
+        )
+      )
+    }
+
+    "Prune subtags" in {
+      val alternativeArticles = JsObject(List(
+            "title" -> JsString("Acme"),
+            "author" -> JsObject(
+              List(
+                "firstname" -> JsString("Bugs"),
+                "lastname" -> JsString("Bunny")
+                )
+              ),
+            "tags" -> JsArray(
+              List[JsValue](
+                JsObject(List("name" -> JsString("Awesome article"))),
+                JsObject(List("name" -> JsString("Must read"))),
+                JsObject(List("name" -> JsString("Playframework"))),
+                JsObject(List("name" -> JsString("Rocks")))
+                )
+              )
+            )
+          )
+
+      JsLens.self \ "tags" \\ "name" prune alternativeArticles must equalTo(JsObject(List(
+            "title" -> JsString("Acme"),
+            "author" -> JsObject(
+              List(
+                "firstname" -> JsString("Bugs"),
+                "lastname" -> JsString("Bunny")
+                )
+              ),
+            "tags" -> JsArray(
+              List[JsValue](
+                JsObject(List()),
+                JsObject(List()),
+                JsObject(List()),
+                JsObject(List())
+                )
+              )
+            )
+          ))
     }
 
 //    "mask -whitelist- an object" in {

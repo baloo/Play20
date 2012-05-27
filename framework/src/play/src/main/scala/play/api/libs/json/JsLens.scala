@@ -50,30 +50,199 @@ object Lens {
   }
 }
 
-case class JsValueLens(getter: JsValue => JsValue,
-                setter: (JsValue, JsValue) => JsValue) extends Lens[JsValue,JsValue]{
+case class SeqJsLens(
+  getter: JsValue => Seq[JsLens],
+  setter: (JsValue, Seq[JsLens]) => JsValue)
+  extends Lens[JsValue, Seq[JsLens]] {
 
   def get = getter
-  def set = setter               
+  def set = setter
 
+  def apply(whole: JsValue): Seq[JsValue] = this.map(whole)
+
+  def prune(whole: JsValue): JsValue = this.foldLeft(whole){
+    (acc, el) => {
+      println("acc " + acc)
+      println("el "  + el.maybeLens)
+      println("el get "  + el.get(acc))
+      println("el set "  + (el.set(JsNull, JsNumber(1))))
+      el prune acc
+    }
+  }
+
+  def set(whole: JsValue, replace: JsValue) = this.foldLeft(whole) {
+    (acc, el) => el set (acc, replace)
+  }
+
+  def map(whole: JsValue): Seq[JsValue] = get(whole).map(_ get whole)
+
+  def foldLeft(whole: JsValue)(callback: (JsValue, JsLens) => JsValue) =
+    get(whole).foldLeft(whole){
+      (acc, el) => callback(acc, el)
+    }
+}
+
+case class JsLens(getter: JsValue => JsValue,
+                  setter: (JsValue, JsValue) => JsValue,
+                  maybeLens: Option[JsLens]) extends Lens[JsValue,JsValue]{
+  /**
+   * Aliases
+   */
+  def get = getter
+  def set = setter
+
+  /**
+   * Helper methods
+   */
   def apply(whole: JsValue) = get(whole)
-
   def apply(whole: JsValue, repl: JsValue) = set(whole, repl)
 
-  def \(f: String) = JsValueLens(
-    JsValueLens.objectGetter(get)(f),
-    JsValueLens.objectSetter(get)(set)(f))
+  /**
+   * Prune items from object
+   */
+  def prune(whole: JsValue): JsValue = {
+    maybeLens.map{
+      case parentLens => 
+        // We will be looking for the item to delete
+        // We'll then search in parent's content for the item to delete, 
+        // if we found a match (reference match) then we'll filter it
 
-  def at(i: Int) = JsValueLens(
-    JsValueLens.arrayGetter(get)(i),
-    JsValueLens.arraySetter(get)(set)(i))
+        // Get back the item to delete
+        val todelete = get(whole)
 
+        // We'll rewrite parent's content with original content filtered from
+        // item to delete
+        parentLens.set(whole, parentLens.get(whole) match {
+          // Quick tip: == is not eq !
+          //   * == makes a deep match
+          //   * eq compares object references
+          case JsObject(elements) => JsObject(elements.filterNot(_._2 eq todelete))
+          case JsArray(elements)  => JsArray(elements.filterNot(_ eq todelete))
+          case e => e
+        })
+      }.getOrElse(whole)
+  }
+
+  def \\(f: String): SeqJsLens = {
+    // Helper methods for getting multiple lenses describing requirements
+    def recursiveFind(whole: JsValue, key: String): List[JsLens] = {
+      whole match {
+        case JsArray(elements) => {
+          elements.foldLeft(List[JsLens]()){
+            (acc, e) => acc ++ recursiveFind(e, key)
+          }.zipWithIndex.map{
+            case (sublens, i) => JsLens at i andThen sublens
+          }
+        }
+        case JsObject(elements) => {
+          elements.foldLeft(List[JsLens]()){
+            (acc, e) => {
+              val (k, v) = e
+              val lensprefix = JsLens \ key
+              acc ++ recursiveFind(v, key).map{
+                case l => lensprefix andThen l
+              } ++ (
+                if (k == key) Some(lensprefix) else None
+              ).toList
+            }
+          }
+        }
+        case _ => Nil
+      }
+    }
+
+    SeqJsLens(
+      (a => recursiveFind(get(a), f).toSeq.map{
+          // Once we have lens we will need to rebase those lenses on the
+          // current one
+          case e => {
+            // We have to do two things:
+            //   - Prefix current lens
+            //   - Prefix parent lens
+            val lens = this andThen e
+            JsLens(lens.getter, lens.setter, lens.maybeLens.map{
+              case p => this andThen p
+            })
+          }
+        }),
+      (a,b) => a
+    )
+  }
+
+  def \(f: String) = JsLens(
+    JsLens.objectGetter(get)(f),
+    JsLens.objectSetter(get)(set)(f),
+    Some(this))
+
+  def at(i: Int) = JsLens(
+    JsLens.arrayGetter(get)(i),
+    JsLens.arraySetter(get)(set)(i),
+    Some(this))
+
+  // TODO: Rewrite this method with SeqJsLens
+  def \\(whole: JsValue,
+         selector: JsValue => Boolean,
+         cb: JsValue => JsValue): JsValue = {
+    // Get back elements
+    val elements = JsLens.selectAll(get(whole), selector).map{
+      t => ((this andThen t._1) -> t._2)
+    }
+
+    elements.foldLeft(whole)((acc, t) => {
+      val lens = t._1
+      val previous = t._2
+
+      lens.set(acc, cb(previous))
+      })
+  }
+
+  /**
+   * Composition methods
+   */
+
+  /**
+   * Compose a lens with an other one
+   * You will change the parent lens with the one specified in that
+   */
+  def compose(that: JsLens): JsLens = JsLens(
+    c => get(that.get(c)),
+    (c, b) => that.set(c, set(that.get(c), b)),
+    // Let's rebuild the parent lens
+    Some(this.maybeLens match {
+      // If parent lens is self, then put that as parent lens
+      case Some(lens) if lens eq JsLens.self => that
+      // If parent lens is identity, then put that as parent lens
+      case Some(lens) if lens eq JsLens.identity => that
+      // If not self nor identity then put the current parent
+      case Some(lens) => lens
+      // If None then put that too
+      case None => that
+    })
+  )
+
+  /**
+   * Add a lens following this one
+   */
+  def andThen(o: JsLens) = o.compose(this)
+
+
+  /**
+   * Transformation methods
+   */
+
+  /**
+   * Get a custom lens from JsValue to a template
+   */
   def as[A](implicit format:Format[A]):Lens[JsValue,A] = Lens[JsValue,A](
     getter = jsValue => format.reads(get(jsValue)), 
     setter = (me, value) => set(me, format.writes(value)) )
 
+  /**
+   * Get a lens from JsValue to an either
+   */
   def asEither[A](implicit format:Format[A]): Lens[JsValue,Either[String, A]] = Lens[JsValue,Either[String, A]](
     getter = jsValue => get(jsValue) match {
+      // TODO: JsUndefined is not a left
       case JsUndefined(e) => Left(e)
       case e => Right(format.reads(e))
     },
@@ -82,6 +251,7 @@ case class JsValueLens(getter: JsValue => JsValue,
       case Right(v) => set(me, format.writes(v))
     })
 
+  //TODO: rewrite without asEither
   def asOpt[A](implicit format:Format[A]): Lens[JsValue,Option[A]] =
     this.asEither andThen Lens[Either[String,A],Option[A]](
       getter = jsValue => jsValue match {
@@ -96,20 +266,6 @@ case class JsValueLens(getter: JsValue => JsValue,
         }
       })
 
-  def \\(whole: JsValue,
-         selector: JsValue => Boolean,
-         cb: JsValue => JsValue): JsValue = {
-    val elements = JsValueLens.selectAll(get(whole), selector).map{
-      t => ((this andThen t._1) -> t._2)
-    }
-
-    elements.foldLeft(whole)((acc, t) => {
-      val lens = t._1
-      val previous = t._2
-
-      lens.set(acc, cb(previous))
-      })
-  }
 }
 
 object JsLens {
@@ -182,12 +338,14 @@ object JsLens {
             case _ => true
           }
           set(whole, JsArray(found match {
-            case false => fields :+ repl
+            case false => fields.padTo(i, JsNull).patch(i, Seq(repl), 1)
+            //case false => fields :+ repl
             case true => fields.patch(i, Seq(repl), 1)
           }))
         }
         case _ => {
-          set(whole, JsArray(Seq(repl)))
+          set(whole, JsArray(Seq().padTo(i,JsNull).patch(i,Seq(repl),1)))
+          //set(whole, JsArray(Seq(repl)))
         }
       }
     }
