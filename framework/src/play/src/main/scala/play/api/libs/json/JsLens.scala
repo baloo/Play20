@@ -112,9 +112,9 @@ case class JsValueLens(getter: JsValue => JsValue,
   }
 }
 
-object JsValueLens {
-  def init = JsValueLens(a => a, (_, a) => a)
-  def self = JsValueLens(a => a, (a, _) => a)
+object JsLens {
+  val identity = JsLens(a => a, (a, _) => a, None)
+  val self = JsLens(a => a, (_, a) => a, Some(JsLens.identity))
 
   def \(f: String): JsValueLens = JsValueLens(
     objectGetter(a => a)(f),
