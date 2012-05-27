@@ -15,7 +15,7 @@ trait Lens[A,B]{
 
   def compose[C,L <: Lens[C,B]](that: Lens[C,A])(implicit cons:LensConstructor[C,B,L]):L = cons(
     c => get(that.get(c)),
-    (c, b) => that.mod(c, set(_, b))
+    (c, b) => that.mod(c, x => set(x, b))
   )
 
   def andThen[C,L <: Lens[A,C]](o: Lens[B,C])(implicit cons:LensConstructor[A,C,L]) = o.compose(self)(cons)
