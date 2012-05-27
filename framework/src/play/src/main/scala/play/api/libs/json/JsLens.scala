@@ -35,10 +35,10 @@ trait PriorityOne {
 
 object LensConstructor extends PriorityOne {
 
-  implicit val jsValueLens = new LensConstructor[JsValue,JsValue,JsValueLens] {
+  implicit val jsValueLens = new LensConstructor[JsValue,JsValue,JsLens] {
 
     def apply(get: JsValue => JsValue,
-              set: (JsValue, JsValue) => JsValue) = JsValueLens(get,set)
+              set: (JsValue, JsValue) => JsValue) = JsLens(get,set, None)
 
   }
 }
@@ -116,17 +116,11 @@ object JsLens {
   val identity = JsLens(a => a, (a, _) => a, None)
   val self = JsLens(a => a, (_, a) => a, Some(JsLens.identity))
 
-  def \(f: String): JsValueLens = JsValueLens(
-    objectGetter(a => a)(f),
-    objectSetter(a => a)((_, a) => a)(f)
-  )
+  def \(f: String): JsLens = JsLens.self \ f
 
-  def at(i: Int): JsValueLens = JsValueLens(
-    arrayGetter(a => a)(i),
-    arraySetter(a => a)((_, a) => a)(i)
-  )
+  def at(i: Int): JsLens = JsLens.self at i
 
-  private[JsValueLens] def objectGetter
+  private[JsLens] def objectGetter
     (get: JsValue => JsValue)
     (f: String): (JsValue => JsValue) = (a => get(a) match {
         case JsObject(fields) => 
@@ -137,7 +131,7 @@ object JsLens {
         case _ => JsUndefined("Element is not an object, couldn't find field "+f)
       })
 
-  private[JsValueLens] def arrayGetter
+  private[JsLens] def arrayGetter
     (get: JsValue => JsValue)
     (i: Int): (JsValue => JsValue) = (a => {
       get(a) match {
@@ -148,7 +142,7 @@ object JsLens {
       }
     })
 
-  private[JsValueLens] def objectSetter
+  private[JsLens] def objectSetter
     (get: JsValue => JsValue)
     (set: (JsValue, JsValue) => JsValue)
     (f: String): ((JsValue, JsValue) => JsValue) = (whole, repl) => {
@@ -177,7 +171,7 @@ object JsLens {
       }
     }
 
-  private[JsValueLens] def arraySetter
+  private[JsLens] def arraySetter
     (get: JsValue => JsValue)
     (set: (JsValue, JsValue) => JsValue)
     (i: Int): ((JsValue, JsValue) => JsValue) = (whole, repl) => {
@@ -198,9 +192,9 @@ object JsLens {
       }
     }
 
-  def selectAll(whole: JsValue, selector: JsValue => Boolean, depth: Int = Int.MaxValue): Seq[(JsValueLens,
+  def selectAll(whole: JsValue, selector: JsValue => Boolean, depth: Int = Int.MaxValue): Seq[(JsLens,
   JsValue)] = {
-    val baseLens = JsValueLens.init
+    val baseLens = JsLens.self
 
     val elements = if(selector(whole)){
       Seq(baseLens -> whole)
@@ -215,19 +209,19 @@ object JsLens {
           fields.flatMap{ tuple => {
               val lens = baseLens \ tuple._1
 
-              JsValueLens.selectAll(tuple._2, selector, depth - 1).map{
+              JsLens.selectAll(tuple._2, selector, depth - 1).map{
                 t => ((lens andThen t._1) -> t._2)
               }
             }
           }
         }
         case JsArray(fields) => {
-          val baseLens = JsValueLens.init
+          val baseLens = JsLens.self
           fields.zipWithIndex.flatMap{ 
             tuple => {
               val lens = baseLens at tuple._2
 
-              JsValueLens.selectAll(tuple._1, selector, depth - 1).map{
+              JsLens.selectAll(tuple._1, selector, depth - 1).map{
                 t => ((lens andThen t._1) -> t._2)
               }
             }
