@@ -161,15 +161,7 @@ case class JsLens(getter: JsValue => JsValue,
       (a => recursiveFind(get(a), f).toSeq.map{
           // Once we have lens we will need to rebase those lenses on the
           // current one
-          case e => {
-            // We have to do two things:
-            //   - Prefix current lens
-            //   - Prefix parent lens
-            val lens = this andThen e
-            JsLens(lens.getter, lens.setter, lens.maybeLens.map{
-              case p => this andThen p
-            })
-          }
+          case e => this andThen e
         }),
       (a,b) => a
     )
@@ -220,7 +212,7 @@ case class JsLens(getter: JsValue => JsValue,
       // If parent lens is identity, then put that as parent lens
       case Some(lens) if lens eq JsLens.identity => that
       // If not self nor identity then put the current parent
-      case Some(lens) => lens
+      case Some(lens) => lens compose that
       // If None then put that too
       case None => that
     })
