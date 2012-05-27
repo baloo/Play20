@@ -147,9 +147,7 @@ case class JsLens(getter: JsValue => JsValue,
             (acc, e) => {
               val (k, v) = e
               val lensprefix = JsLens \ key
-              acc ++ recursiveFind(v, key).map{
-                case l => lensprefix andThen l
-              } ++ (
+              acc ++ recursiveFind(v, key).map(lensprefix andThen _) ++ (
                 if (k == key) Some(lensprefix) else None
               ).toList
             }
@@ -318,15 +316,15 @@ object JsLens {
           }
           set(whole, JsObject(found match {
             case false => fields :+ (f -> repl)
-            case true => fields.map{
-              t => t match {
+            case true => fields.map(
+              _ match {
                 case (k: String, v: JsValue) => if(k == f){
                   k -> repl
                 }else{
                   k -> v
                 }
               }
-            }
+            )
           }))
         }
         case _ => {
