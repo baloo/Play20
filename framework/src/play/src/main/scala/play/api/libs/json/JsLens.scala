@@ -61,13 +61,7 @@ case class SeqJsLens(
   def apply(whole: JsValue): Seq[JsValue] = this.map(whole)
 
   def prune(whole: JsValue): JsValue = this.foldLeft(whole){
-    (acc, el) => {
-      println("acc " + acc)
-      println("el "  + el.maybeLens)
-      println("el get "  + el.get(acc))
-      println("el set "  + (el.set(JsNull, JsNumber(1))))
-      el prune acc
-    }
+    (acc, el) => el prune acc
   }
 
   def set(whole: JsValue, replace: JsValue) = this.foldLeft(whole) {
