@@ -79,6 +79,8 @@ trait Enumerator[E] {
 
   def interleave[B >: E](other: Enumerator[B]): Enumerator[B] = Enumerator.interleave(this, other)
 
+  def >‏[B >: E](other: Enumerator[B]): Enumerator[B] = interleave(other)
+
   /**
    * Alias for interleave
    */
